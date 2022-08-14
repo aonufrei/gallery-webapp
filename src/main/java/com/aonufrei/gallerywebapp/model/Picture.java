@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity(name = "picture")
+@Entity(name = "pictures")
 public class Picture {
 
 	@Id
@@ -26,6 +26,9 @@ public class Picture {
 
 	@Column(nullable = false)
 	private Boolean isSharedToPublic;
+
+	@Column(nullable = false, name = "system_filename")
+	private String inSystemFilename;
 
 	@ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
 	@JoinColumn(name = "owner_id", updatable = false, insertable = false)

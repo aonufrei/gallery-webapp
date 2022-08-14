@@ -1,5 +1,6 @@
 package com.aonufrei.gallerywebapp.controller.ui;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -11,11 +12,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class MainUIController {
 
+	@PreAuthorize("isAnonymous()")
 	@GetMapping(value = {"", "home"})
 	private String homepage(Model model) {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 		boolean isAuthenticated = !(authentication instanceof AnonymousAuthenticationToken) && authentication.isAuthenticated();
-		System.out.println(isAuthenticated);
 
 		model.addAttribute("logged", isAuthenticated);
 		return "index";

@@ -1,5 +1,7 @@
 package com.aonufrei.gallerywebapp.controller.rest;
 
+import com.aonufrei.gallerywebapp.dto.PictureInfoDto;
+import com.aonufrei.gallerywebapp.dto.PictureOutDto;
 import com.aonufrei.gallerywebapp.dto.ResponseDto;
 import com.aonufrei.gallerywebapp.service.PictureService;
 import org.slf4j.Logger;
@@ -25,7 +27,7 @@ public class PictureRestController {
 		this.request = request;
 	}
 
-	@GetMapping
+	@GetMapping("specific")
 	private ResponseEntity<byte[]> provideUserPicture(@RequestParam("pic") String token) {
 		LOG.info("Token provided: " + token);
 		try {
@@ -38,10 +40,12 @@ public class PictureRestController {
 	}
 
 	@PostMapping
-	private ResponseEntity<ResponseDto> createPicture(@RequestParam("name") String name, @RequestParam("pic") MultipartFile pic) {
+	private ResponseEntity<ResponseDto> createPicture(@RequestParam(value = "name", required = false) String name,
+													  @RequestParam(value = "public", required = false) Boolean isPublic,
+													  @RequestParam("pic") MultipartFile pic) {
 		LOG.info("Create picture with name: " + name);
 		try {
-			pictureService.savePicture(pic);
+			pictureService.savePicture(null, new PictureInfoDto(name, isPublic), pic);
 			return ResponseEntity.ok(ResponseDto.builder().message("Successfully saved").build());
 		} catch (Throwable e) {
 			LOG.error("Cannot save image: ", e);
