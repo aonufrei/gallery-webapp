@@ -2,15 +2,21 @@ package com.aonufrei.gallerywebapp.service;
 
 
 import com.aonufrei.gallerywebapp.dto.AccountInDto;
+import com.aonufrei.gallerywebapp.exceptions.AccountNotFoundException;
+import com.aonufrei.gallerywebapp.exceptions.InvalidAccountIdFormatException;
 import com.aonufrei.gallerywebapp.model.Account;
 import com.aonufrei.gallerywebapp.repo.AccountRepository;
 import com.aonufrei.gallerywebapp.utils.GeneralUtils;
+import org.apache.commons.lang3.math.NumberUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AccountService {
 
+	private final Logger LOG = LoggerFactory.getLogger(AccountService.class);
 	private final AccountRepository accountRepository;
 	private final PasswordEncoder passwordEncoder;
 
@@ -28,6 +34,29 @@ public class AccountService {
 				.build();
 		Account savedAccount = accountRepository.save(accountForDb);
 		return savedAccount.getId();
+	}
+
+	public Integer validateAccountId(String accountId) {
+		if (NumberUtils.isCreatable(accountId)) {
+			Integer intAccountId = NumberUtils.createInteger(accountId);
+			return validateAccountId(intAccountId);
+		}
+		throw new InvalidAccountIdFormatException(String.format("Account id of wrong format was provided [%s]", accountId));
+	}
+
+	public Integer validateAccountId(Integer accountId) {
+		if (accountId != null && accountRepository.existsById(accountId)) {
+			return accountId;
+		}
+		throw new AccountNotFoundException(String.format("Account with id [%d] was now found", accountId));
+	}
+
+	public String getUsernameById(Integer id) {
+		Account account = accountRepository.getById(id);
+		if (account == null) {
+			throw new AccountNotFoundException(String.format("Account with id [%d] was now found", id));
+		}
+		return account.getUsername();
 	}
 
 	public Account getAccountByUsername(String username) {

@@ -39,20 +39,4 @@ public class PictureRestController {
 		}
 	}
 
-	@PostMapping
-	private ResponseEntity<ResponseDto> createPicture(@RequestParam(value = "name", required = false) String name,
-													  @RequestParam(value = "public", required = false) Boolean isPublic,
-													  @RequestParam("pic") MultipartFile pic) {
-		LOG.info("Create picture with name: " + name);
-		try {
-			pictureService.savePicture(null, new PictureInfoDto(name, isPublic), pic);
-			return ResponseEntity.ok(ResponseDto.builder().message("Successfully saved").build());
-		} catch (Throwable e) {
-			LOG.error("Cannot save image: ", e);
-			return ResponseEntity.badRequest()
-					.body(ResponseDto.builder().message("An error occurred when saving the picture").error(true).build());
-		}
-	}
-
-
 }
