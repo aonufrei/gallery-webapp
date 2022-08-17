@@ -3,6 +3,7 @@ package com.aonufrei.gallerywebapp.controller.ui;
 import com.aonufrei.gallerywebapp.dto.PictureInfoDto;
 import com.aonufrei.gallerywebapp.service.AccountService;
 import com.aonufrei.gallerywebapp.service.PictureService;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -17,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
+@Hidden
 @Controller
-@RequestMapping
 public class MainUIController {
 
 	private static final Logger LOG = LoggerFactory.getLogger(MainUIController.class);
