@@ -10,9 +10,11 @@ import com.aonufrei.gallerywebapp.model.Picture;
 import com.aonufrei.gallerywebapp.repo.PictureRepository;
 import lombok.extern.java.Log;
 import org.apache.commons.io.IOUtils;
+import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,6 +37,8 @@ public class PictureService {
 	private final AccountService accountService;
 	private final AmazonS3 s3Client;
 
+	private final ModelMapper modelMapper = new ModelMapper();
+
 	@Value("${s3.main-bucket-name}")
 	private String bucketName;
 
@@ -41,6 +46,31 @@ public class PictureService {
 		this.pictureRepository = pictureRepository;
 		this.accountService = accountService;
 		this.s3Client = s3Client;
+	}
+
+	public List<PictureOutDto> getAllPublicImages(Integer pageSize, Integer pageNumber) {
+		return pictureRepository.getPicturesByIsSharedToPublic(true, Pageable.ofSize(pageSize).withPage(pageNumber))
+				.stream()
+				.map(this::convertModelToOutDto)
+				.collect(Collectors.toList());
+	}
+
+	public List<PictureOutDto> getPicturesForUser(Integer currentUserId, Integer userId, Integer pageSize, Integer pageNumber) {
+		Pageable pageable = Pageable.ofSize(pageSize).withPage(pageNumber);
+		Page<Picture> result = currentUserId != null && currentUserId.equals(userId)
+				? pictureRepository.getPicturesByOwnerIdOrderByModifiedAt(userId, pageable)
+				: pictureRepository.getPicturesByOwnerIdAndIsSharedToPublicOrderByModifiedAt(userId, true, pageable);
+		return result.stream()
+				.map(this::convertModelToOutDto)
+				.collect(Collectors.toList());
+	}
+
+	public PictureOutDto getPictureByOwnerAndName(Integer currentUser, Integer userId, String name) {
+		PictureOutDto picture = this.getPicture(name, userId);
+		if (picture != null && (picture.getIsPublic() || Objects.equals(currentUser, userId))) {
+			return picture;
+		}
+		throw new RuntimeException("Picture was not found");
 	}
 
 	public String convertPictureTokenToPath(String token) {
@@ -73,7 +103,7 @@ public class PictureService {
 	}
 
 	private PictureOutDto convertModelToOutDto(Picture picture) {
-		String pictureUrl = "api/v1/gallery/specific?pic=" + createPictureS3Name(picture.getName(), picture.getOwner().getUsername());
+		String pictureUrl = "api/v1/gallery/specific?pic=" + createS3PictureName(picture.getName(), picture.getOwner().getUsername());
 		return new PictureOutDto(picture.getName(), picture.getIsSharedToPublic(), pictureUrl, picture.getCreatedAt());
 	}
 
@@ -85,7 +115,7 @@ public class PictureService {
 		}
 		return convertModelToOutDto(pictureFromDb);
 	}
-	public void savePicture(Integer ownerId, PictureInfoDto pictureInfoDto, MultipartFile file) throws IOException {
+	public PictureOutDto savePicture(Integer ownerId, PictureInfoDto pictureInfoDto, MultipartFile file) throws IOException {
 		validatePictureInfo(pictureInfoDto);
 		String ownerUsername = accountService.getUsernameById(ownerId);
 		if (!isValidImage(file)) {
@@ -99,7 +129,7 @@ public class PictureService {
 		if (pictureInfoDto.getName() == null) {
 			name = UUID.randomUUID().toString();
 		}
-		String s3Filename = createPictureS3Name(ownerUsername, pictureInfoDto.getName());
+		String s3Filename = createS3PictureName(ownerUsername, pictureInfoDto.getName());
 		saveFileToS3(s3Filename, file);
 		Picture pictureForDb = Picture.builder()
 				.name(name)
@@ -113,9 +143,10 @@ public class PictureService {
 			s3Client.deleteObject(s3Filename, bucketName);
 			throw new RuntimeException("Failed to save your picture in our system");
 		}
+		return getPicture(name, ownerId);
 	}
 
-	public String createPictureS3Name(String ownerUsername, String pictureName) {
+	public String createS3PictureName(String ownerUsername, String pictureName) {
 		return String.format("%s/%s", ownerUsername, pictureName);
 	}
 

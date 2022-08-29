@@ -3,6 +3,7 @@ package com.aonufrei.gallerywebapp.service;
 
 import com.aonufrei.gallerywebapp.dto.AccountInDto;
 import com.aonufrei.gallerywebapp.exceptions.AccountNotFoundException;
+import com.aonufrei.gallerywebapp.exceptions.AuthorizationError;
 import com.aonufrei.gallerywebapp.exceptions.InvalidAccountIdFormatException;
 import com.aonufrei.gallerywebapp.model.Account;
 import com.aonufrei.gallerywebapp.repo.AccountRepository;
@@ -20,9 +21,12 @@ public class AccountService {
 	private final AccountRepository accountRepository;
 	private final PasswordEncoder passwordEncoder;
 
-	public AccountService(AccountRepository accountRepository, PasswordEncoder passwordEncoder) {
+	private final IsTokenService<AccountInDto> tokenService;
+
+	public AccountService(AccountRepository accountRepository, PasswordEncoder passwordEncoder, IsTokenService<AccountInDto> tokenService) {
 		this.accountRepository = accountRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.tokenService = tokenService;
 	}
 
 	public Integer createAccount(AccountInDto accountInDto) {
@@ -34,6 +38,23 @@ public class AccountService {
 				.build();
 		Account savedAccount = accountRepository.save(accountForDb);
 		return savedAccount.getId();
+	}
+
+	public String getAuthToken(String username, String password) {
+		if (username == null || password == null) {
+			throw new AuthorizationError("Forbidden");
+		}
+		Account accountByUsername = getAccountByUsername(username);
+		if (accountByUsername == null) {
+			LOG.error("Account was not found in the database");
+			throw new AuthorizationError("Forbidden");
+		}
+		String encodedPassword = passwordEncoder.encode(password);
+		if (accountByUsername.getPassword().equals(encodedPassword)) {
+			throw new AuthorizationError("Forbidden");
+		}
+
+		return tokenService.encode(username, password);
 	}
 
 	public Integer validateAccountId(String accountId) {
