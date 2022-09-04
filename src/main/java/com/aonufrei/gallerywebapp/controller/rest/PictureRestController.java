@@ -2,6 +2,7 @@ package com.aonufrei.gallerywebapp.controller.rest;
 
 import com.aonufrei.gallerywebapp.dto.PictureInfoDto;
 import com.aonufrei.gallerywebapp.dto.PictureOutDto;
+import com.aonufrei.gallerywebapp.exceptions.GeneralRequestError;
 import com.aonufrei.gallerywebapp.service.PictureService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;
 
@@ -28,16 +28,8 @@ public class PictureRestController {
 
 	private final PictureService pictureService;
 
-	private final HttpServletRequest request;
-
-	public PictureRestController(PictureService pictureService, HttpServletRequest request) {
+	public PictureRestController(PictureService pictureService) {
 		this.pictureService = pictureService;
-		this.request = request;
-	}
-
-	@GetMapping("health")
-	private String healthCheck() {
-		return "ok";
 	}
 
 	@GetMapping("specific")
@@ -71,16 +63,9 @@ public class PictureRestController {
 	private ResponseEntity<PictureOutDto> getUserPicture(@PathVariable("user") Integer userId,
 	                                                     @PathVariable("name") String pictureName) {
 		// private image will be shown to owner only
-		pictureService.getPictureByOwnerAndName(null, userId, pictureName);
-		return ResponseEntity.ok(null);
-	}
-
-	@GetMapping("{user}/{name}/url")
-	private ResponseEntity<PictureOutDto> getPictureUrl(@PathVariable("user") Integer userId,
-	                                                    @PathVariable("name") String pictureName) {
-		// TODO: Implement
-		// returns url to the image if it is public
-		return ResponseEntity.ok(null);
+		Integer ownerId = null;
+		PictureOutDto result = pictureService.getPictureByOwnerAndName(ownerId, userId, pictureName);
+		return ResponseEntity.ok(result);
 	}
 
 	@PostMapping
@@ -98,17 +83,23 @@ public class PictureRestController {
 
 	@PutMapping
 	private ResponseEntity<PictureOutDto> updatePicture(@RequestParam(value = "name", required = false) String pictureName,
-	                                                    @RequestParam(value = "is_public", required = false) Boolean isPublic,
-	                                                    @RequestParam(value = "pic", required = false) MultipartFile pictureFile) {
-		// TODO: Implement
-		// returns updated picture
-		return ResponseEntity.ok(null);
+	                                                    @RequestParam(value = "is_public", required = true) Boolean isPublic) {
+		PictureOutDto result;
+		Integer ownerId = null;
+		try {
+			result = pictureService.changeVisibility(ownerId, pictureName, isPublic);
+		} catch (IOException e) {
+			log.error("Unable to change picture visibility", e);
+			throw new GeneralRequestError("Unable to change picture visibility", e);
+		}
+		return ResponseEntity.ok(result);
 	}
 
 	@DeleteMapping
 	private ResponseEntity<?> deletePicture(@RequestParam("name") String name) {
-		// TODO: Implement
-		// only owner can delete picture
+
+		Integer ownerId = null;
+		pictureService.deletePicture(name, ownerId);
 		return ResponseEntity.ok().build();
 	}
 

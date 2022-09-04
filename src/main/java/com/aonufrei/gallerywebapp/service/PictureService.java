@@ -1,6 +1,7 @@
 package com.aonufrei.gallerywebapp.service;
 
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.aonufrei.gallerywebapp.dto.PictureInfoDto;
@@ -8,7 +9,6 @@ import com.aonufrei.gallerywebapp.dto.PictureOutDto;
 import com.aonufrei.gallerywebapp.dto.PictureUpdateInfoDto;
 import com.aonufrei.gallerywebapp.model.Picture;
 import com.aonufrei.gallerywebapp.repo.PictureRepository;
-import lombok.extern.java.Log;
 import org.apache.commons.io.IOUtils;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
@@ -20,13 +20,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
-import java.io.FileInputStream;
+import javax.transaction.Transactional;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class PictureService {
@@ -36,8 +37,6 @@ public class PictureService {
 	private final PictureRepository pictureRepository;
 	private final AccountService accountService;
 	private final AmazonS3 s3Client;
-
-	private final ModelMapper modelMapper = new ModelMapper();
 
 	@Value("${s3.main-bucket-name}")
 	private String bucketName;
@@ -77,10 +76,6 @@ public class PictureService {
 		return token;
 	}
 
-	public String picturePathToToken(String path) {
-		return path;
-	}
-
 	public byte[] getPictureFromPath(String path) throws IOException {
 		try (InputStream bImage = getPictureFromS3(path)) {
 			return IOUtils.toByteArray(bImage);
@@ -118,7 +113,7 @@ public class PictureService {
 	public PictureOutDto savePicture(Integer ownerId, PictureInfoDto pictureInfoDto, MultipartFile file) throws IOException {
 		validatePictureInfo(pictureInfoDto);
 		String ownerUsername = accountService.getUsernameById(ownerId);
-		if (!isValidImage(file)) {
+		if (!isValidImageFormat(file)) {
 			LOG.error("Unsupported image format was provided");
 			throw new RuntimeException("Unsupported image format provided");
 		}
@@ -146,6 +141,14 @@ public class PictureService {
 		return getPicture(name, ownerId);
 	}
 
+	@Transactional
+	public PictureOutDto changeVisibility(Integer ownerId, String pictureName, boolean isPublic) throws IOException {
+		Picture targetPicture = pictureRepository.getPictureByNameAndOwnerId(pictureName, ownerId);
+		targetPicture.setIsSharedToPublic(isPublic);
+		pictureRepository.save(targetPicture);
+		return convertModelToOutDto(targetPicture);
+	}
+
 	public String createS3PictureName(String ownerUsername, String pictureName) {
 		return String.format("%s/%s", ownerUsername, pictureName);
 	}
@@ -162,21 +165,27 @@ public class PictureService {
 	}
 
 	public void deletePicture(String name, Integer ownerId) {
-		pictureRepository.deleteByNameAndOwnerId(name, ownerId);
+		Picture targetPicture = pictureRepository.getPictureByNameAndOwnerId(name, ownerId);
+		if (targetPicture == null) return;
+		try {
+			pictureRepository.deleteById(targetPicture.getId());
+		} catch (Exception e) {
+			LOG.error("Error during deleting picture with id: " + targetPicture.getId(), e);
+			return;
+		}
+		String ownerUsername = accountService.getUsernameById(ownerId);
+		DeleteObjectRequest deletePictureRequest =
+				new DeleteObjectRequest(bucketName, createS3PictureName(ownerUsername, name));
+		s3Client.deleteObject(deletePictureRequest);
 	}
 
-	public static void validatePictureUpdateInfo(PictureUpdateInfoDto pictureUpdateInfoDto) {
-		if (pictureUpdateInfoDto == null) {
-			throw new RuntimeException("Picture information was not provided");
-		}
-	}
 	public static void validatePictureInfo(PictureInfoDto pictureInfoDto) {
 		if (pictureInfoDto == null) {
 			throw new RuntimeException("Picture information was not provided");
 		}
 	}
 
-	public static boolean isValidImage(MultipartFile uploadedFile) throws IOException {
+	public static boolean isValidImageFormat(MultipartFile uploadedFile) throws IOException {
 		try (InputStream input = uploadedFile.getInputStream()) {
 			try {
 				return ImageIO.read(input).toString() != null;
