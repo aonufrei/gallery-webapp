@@ -6,11 +6,10 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.aonufrei.gallerywebapp.dto.PictureInfoDto;
 import com.aonufrei.gallerywebapp.dto.PictureOutDto;
-import com.aonufrei.gallerywebapp.dto.PictureUpdateInfoDto;
 import com.aonufrei.gallerywebapp.model.Picture;
 import com.aonufrei.gallerywebapp.repo.PictureRepository;
 import org.apache.commons.io.IOUtils;
-import org.modelmapper.ModelMapper;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class PictureService {
@@ -41,10 +39,20 @@ public class PictureService {
 	@Value("${s3.main-bucket-name}")
 	private String bucketName;
 
+	@Value("${host.url}")
+	private String hostPrefix;
+
 	public PictureService(PictureRepository pictureRepository, AccountService accountService, AmazonS3 s3Client) {
 		this.pictureRepository = pictureRepository;
 		this.accountService = accountService;
 		this.s3Client = s3Client;
+	}
+
+	public byte[] getPictureByToken(String token) throws IOException {
+		if (!pictureRepository.existsPictureByToken(token)) {
+			throw new RuntimeException("Picture with specified token cannot be found");
+		}
+		return getS3PictureByToken(token);
 	}
 
 	public List<PictureOutDto> getAllPublicImages(Integer pageSize, Integer pageNumber) {
@@ -65,25 +73,21 @@ public class PictureService {
 	}
 
 	public PictureOutDto getPictureByOwnerAndName(Integer currentUser, Integer userId, String name) {
-		PictureOutDto picture = this.getPicture(name, userId);
+		PictureOutDto picture = this.getPictureForUser(name, userId);
 		if (picture != null && (picture.getIsPublic() || Objects.equals(currentUser, userId))) {
 			return picture;
 		}
 		throw new RuntimeException("Picture was not found");
 	}
 
-	public String convertPictureTokenToPath(String token) {
-		return token;
-	}
-
-	public byte[] getPictureFromPath(String path) throws IOException {
-		try (InputStream bImage = getPictureFromS3(path)) {
+	public byte[] getS3PictureByToken(String token) throws IOException {
+		try (InputStream bImage = getPictureFromS3(token)) {
 			return IOUtils.toByteArray(bImage);
 		}
 	}
 
 	public InputStream getPictureFromS3(String s3PictureName) {
-		S3Object s3Picture = s3Client.getObject(s3PictureName, bucketName);
+		S3Object s3Picture = s3Client.getObject(bucketName, s3PictureName);
 		if (s3Picture == null) {
 			LOG.error("Picture " + s3PictureName + " was not found in s3");
 			throw new RuntimeException("Picture was not found in s3");
@@ -98,15 +102,18 @@ public class PictureService {
 	}
 
 	private PictureOutDto convertModelToOutDto(Picture picture) {
-		String pictureUrl = "api/v1/gallery/specific?pic=" + createS3PictureName(picture.getName(), picture.getOwner().getUsername());
+		String pictureUrl = String.format("%sapi/v1/picture/specific?pic=%s", hostPrefix, picture.getToken());
 		return new PictureOutDto(picture.getName(), picture.getIsSharedToPublic(), pictureUrl, picture.getCreatedAt());
 	}
 
-	public PictureOutDto getPicture(String name, Integer ownerId) {
+	public PictureOutDto getPictureForUser(String name, Integer ownerId) {
 		Picture pictureFromDb = pictureRepository.getPictureByNameAndOwnerId(name, ownerId);
 		if (pictureFromDb == null) {
 			LOG.error(String.format("Picture of name %s of user %d was not found", name, ownerId));
 			throw new RuntimeException("Picture was not found");
+		}
+		if (pictureFromDb.getOwner() == null) {
+			pictureFromDb.setOwner(accountService.getAccountById(ownerId));
 		}
 		return convertModelToOutDto(pictureFromDb);
 	}
@@ -124,21 +131,32 @@ public class PictureService {
 		if (pictureInfoDto.getName() == null) {
 			name = UUID.randomUUID().toString();
 		}
-		String s3Filename = createS3PictureName(ownerUsername, pictureInfoDto.getName());
-		saveFileToS3(s3Filename, file);
+
+		String token = generateNewPictureToken();
+		saveFileToS3(token, file);
 		Picture pictureForDb = Picture.builder()
 				.name(name)
 				.isSharedToPublic(isPublic)
 				.ownerId(ownerId)
+				.token(token)
 				.build();
 		try {
 			pictureRepository.save(pictureForDb);
 		} catch (Exception e) {
 			LOG.error("Exception occurred during picture saving to db", e);
-			s3Client.deleteObject(s3Filename, bucketName);
+			s3Client.deleteObject(token, bucketName);
 			throw new RuntimeException("Failed to save your picture in our system");
 		}
-		return getPicture(name, ownerId);
+		return getPictureForUser(name, ownerId);
+	}
+
+	private String generateNewPictureToken() {
+		while (true) {
+			String token = RandomStringUtils.random(8, true, true);
+			if (!pictureRepository.existsPictureByToken(token)) {
+				return token;
+			}
+		}
 	}
 
 	@Transactional

@@ -7,10 +7,12 @@ import com.aonufrei.gallerywebapp.exceptions.AuthorizationError;
 import com.aonufrei.gallerywebapp.exceptions.InvalidAccountIdFormatException;
 import com.aonufrei.gallerywebapp.model.Account;
 import com.aonufrei.gallerywebapp.repo.AccountRepository;
+import com.aonufrei.gallerywebapp.security.data.AccountUserDetails;
 import com.aonufrei.gallerywebapp.utils.GeneralUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -89,6 +91,17 @@ public class AccountService {
 			throw new RuntimeException("Account was not found");
 		}
 		return accountByUsername;
+	}
+
+	public Account getAccountById(Integer id) {
+		if (id == null) {
+			return null;
+		}
+		return accountRepository.getById(id);
+	}
+
+	public static AccountUserDetails getAuthorizedAccount() {
+		return (AccountUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 	}
 
 	public void validateAccount(AccountInDto accountInDto) {

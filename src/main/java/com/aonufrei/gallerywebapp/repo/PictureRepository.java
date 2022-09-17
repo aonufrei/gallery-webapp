@@ -17,4 +17,7 @@ public interface PictureRepository extends JpaRepository<Picture, Integer> {
 
 	Page<Picture> getPicturesByOwnerIdAndIsSharedToPublicOrderByModifiedAt(Integer ownerId, boolean isSharedToPublic, Pageable pageable);
 
+	boolean existsPictureByToken(String token);
+
+	Picture getPictureByToken(String token);
 }

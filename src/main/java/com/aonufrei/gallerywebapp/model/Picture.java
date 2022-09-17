@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.context.annotation.Primary;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
@@ -27,12 +28,15 @@ public class Picture {
 	@Column(nullable = false)
 	private Boolean isSharedToPublic;
 
-	@ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+	@ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.DETACH)
 	@JoinColumn(name = "owner_id", updatable = false, insertable = false)
 	private Account owner;
 
 	@Column(name = "owner_id", nullable = false)
 	private Integer ownerId;
+
+	@Column(name = "token", unique = true, nullable = false)
+	private String token;
 
 	@CreationTimestamp
 	private LocalDateTime createdAt;

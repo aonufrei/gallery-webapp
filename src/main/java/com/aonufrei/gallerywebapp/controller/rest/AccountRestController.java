@@ -8,10 +8,13 @@ import com.aonufrei.gallerywebapp.service.AccountService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("api/v1/account")
+@RequestMapping("api/v1/auth")
 public class AccountRestController {
 
 	private final Logger log = LoggerFactory.getLogger(AccountRestController.class);
@@ -22,7 +25,7 @@ public class AccountRestController {
 		this.accountService = accountService;
 	}
 
-	@PostMapping("register")
+	@PostMapping("/register")
 	public ResponseEntity<IsAccountResponse> registerAccount(@RequestBody AccountInDto accountInDto) {
 		try {
 			accountService.createAccount(accountInDto);
@@ -33,8 +36,9 @@ public class AccountRestController {
 		}
 	}
 
-	@GetMapping("auth")
+	@PostMapping("login")
 	public ResponseEntity<IsAccountResponse> getAuthKey(@RequestBody AccountInDto accountInDto) {
+		System.out.println(accountInDto);
 		try {
 			String token = accountService.getAuthToken(accountInDto.getUsername(), accountInDto.getPassword());
 			return ResponseEntity.ok(new AccountTokenResponse(token));
