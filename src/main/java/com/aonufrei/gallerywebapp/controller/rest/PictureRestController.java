@@ -3,6 +3,8 @@ package com.aonufrei.gallerywebapp.controller.rest;
 import com.aonufrei.gallerywebapp.dto.PictureInfoDto;
 import com.aonufrei.gallerywebapp.dto.PictureOutDto;
 import com.aonufrei.gallerywebapp.exceptions.GeneralRequestError;
+import com.aonufrei.gallerywebapp.exceptions.PictureNotFoundException;
+import com.aonufrei.gallerywebapp.exceptions.PermissionRequiredException;
 import com.aonufrei.gallerywebapp.security.data.AccountUserDetails;
 import com.aonufrei.gallerywebapp.service.AccountService;
 import com.aonufrei.gallerywebapp.service.PictureService;
@@ -17,9 +19,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,25 +33,15 @@ import java.util.List;
 @SecurityRequirement(name = "app-security")
 public class PictureRestController {
 
-	private final Logger log = LoggerFactory.getLogger(PictureRestController.class);
+	private final Logger LOG = LoggerFactory.getLogger(PictureRestController.class);
 
 	private final PictureService pictureService;
+	private final AccountService accountService;
 
-	public PictureRestController(PictureService pictureService) {
+	public PictureRestController(PictureService pictureService, AccountService accountService) {
 		this.pictureService = pictureService;
+		this.accountService = accountService;
 	}
-
-	@GetMapping(value = "specific", produces = MediaType.IMAGE_JPEG_VALUE)
-	private ResponseEntity<byte[]> provideUserPicture(@RequestParam("pic") String token) {
-		log.info("Token provided: " + token);
-		try {
-			return ResponseEntity.ok(pictureService.getPictureByToken(token));
-		} catch (Throwable e) {
-			log.error("Cannot provide user a picture", e);
-			return ResponseEntity.badRequest().build();
-		}
-	}
-
 	@GetMapping("feeds")
 	public ResponseEntity<List<PictureOutDto>> getAllPublicImage(@RequestParam("page_size") Integer size,
 	                                                             @RequestParam("page_number") Integer number) {
@@ -57,72 +49,86 @@ public class PictureRestController {
 		return ResponseEntity.ok(allPublicImages);
 	}
 
-	@GetMapping("{user}")
-	private ResponseEntity<List<PictureOutDto>> getAllPicturesForUser(@PathVariable("user") Integer userId,
+	@GetMapping("{username}")
+	private ResponseEntity<List<PictureOutDto>> getAllPicturesForUser(@PathVariable("username") String username,
 	                                                                  @RequestParam("page_size") Integer size,
 	                                                                  @RequestParam("page_number") Integer number) {
-		AccountUserDetails authorizedAccount = AccountService.getAuthorizedAccount();
-		if (authorizedAccount == null || authorizedAccount.getId() == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-		}
-		List<PictureOutDto> picturesForUser = pictureService.getPicturesForUser(authorizedAccount.getId(), userId, size, number);
+		Integer currentUserId = accountService.getAuthorizedAccountId();
+		List<PictureOutDto> picturesForUser = pictureService.getPicturesForUser(currentUserId, username, size, number);
 		return ResponseEntity.ok(picturesForUser);
 	}
 
-	@GetMapping("{user}/{name}")
-	private ResponseEntity<PictureOutDto> getUserPicture(@PathVariable("user") Integer userId,
-	                                                     @PathVariable("name") String pictureName) {
+	@GetMapping("{username}/{token}")
+	private ResponseEntity<PictureOutDto> getUserPictureInfo(@PathVariable("username") String username,
+	                                                     @PathVariable("token") String token) {
 		// private image will be shown to owner only
-		AccountUserDetails authorizedAccount = AccountService.getAuthorizedAccount();
-		if (authorizedAccount == null || authorizedAccount.getId() == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+		Integer currentUserId = accountService.getAuthorizedAccountId();
+		PictureOutDto result;
+		try {
+			result = pictureService.getPictureInfoByUsernameAndToken(currentUserId, username, token);
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+			throw t;
 		}
-		PictureOutDto result = pictureService.getPictureByOwnerAndName(authorizedAccount.getId(), userId, pictureName);
 		return ResponseEntity.ok(result);
+	}
+
+	@GetMapping(value = "{username}/{token}/pic", produces = MediaType.IMAGE_JPEG_VALUE)
+	private ResponseEntity<byte[]> getUserPicture(@PathVariable("username") String username,
+														 @PathVariable("token") String token) {
+		// private image will be shown to owner only
+		Integer currentUserId = accountService.getAuthorizedAccountId();
+		try {
+			byte[] pic = pictureService.getPictureBytesByUsernameAndToken(currentUserId, username, token);
+			return ResponseEntity.ok(pic);
+		} catch (PictureNotFoundException e) {
+			LOG.error(e.getMessage(), e);
+			throw e;
+		}
 	}
 
 	@PostMapping
 	private ResponseEntity<PictureOutDto> createPicture(@RequestParam(value = "name", required = false) String pictureName,
 														@RequestParam(value = "is_public", required = false) Boolean isPublic,
 														@RequestParam(value = "pic") MultipartFile pictureFile) {
-		AccountUserDetails authorizedAccount = AccountService.getAuthorizedAccount();
+		AccountUserDetails authorizedAccount = accountService.getAuthorizedAccount();
 		if (authorizedAccount == null || authorizedAccount.getId() == null) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
 		}
 		try {
-			PictureOutDto pictureOutDto = pictureService.savePicture(authorizedAccount.getId(), new PictureInfoDto(null, true), pictureFile);
+			PictureOutDto pictureOutDto = pictureService.savePicture(authorizedAccount.getId(), new PictureInfoDto(pictureName, isPublic), pictureFile);
 			return ResponseEntity.ok(pictureOutDto);
 		} catch (Throwable t) {
-			log.error("Unable to create picture", t);
+			LOG.error("Unable to create picture", t);
 			return ResponseEntity.badRequest().body(null);
 		}
 	}
 
-	@PutMapping
-	private ResponseEntity<PictureOutDto> updatePicture(@RequestParam(value = "name", required = false) String pictureName,
-	                                                    @RequestParam(value = "is_public", required = true) Boolean isPublic) {
-		PictureOutDto result;
-		AccountUserDetails authorizedAccount = AccountService.getAuthorizedAccount();
-		if (authorizedAccount == null || authorizedAccount.getId() == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+	@PutMapping("{username}/{token}")
+	private ResponseEntity<PictureOutDto> updatePictureInfo(@PathVariable("username") String username,
+															@PathVariable("token") String token,
+															@RequestBody PictureInfoDto pictureInfoDto) {
+		Integer authorizedAccountId = accountService.getAuthorizedAccountId();
+		if (!accountService.isSameAccount(authorizedAccountId, username)) {
+			throw new PermissionRequiredException("User only has access to his pictures");
 		}
+		PictureOutDto result;
 		try {
-			result = pictureService.changeVisibility(authorizedAccount.getId(), pictureName, isPublic);
-		} catch (IOException e) {
-			log.error("Unable to change picture visibility", e);
-			throw new GeneralRequestError("Unable to change picture visibility", e);
+			result = pictureService.updatePictureInformation(username, token, pictureInfoDto);
+		} catch (Throwable t) {
+			LOG.error("Error occurred when updating picture information", t);
+			throw new GeneralRequestError("Error occurred when updating picture information. Please, try again later", t);
 		}
 		return ResponseEntity.ok(result);
 	}
 
-	@DeleteMapping
-	private ResponseEntity<?> deletePicture(@RequestParam("name") String name) {
-		AccountUserDetails authorizedAccount = AccountService.getAuthorizedAccount();
-		if (authorizedAccount == null || authorizedAccount.getId() == null) {
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+	@DeleteMapping("{username}/{token}")
+	private ResponseEntity<Boolean> deletePicture(@PathVariable("username") String username, @PathVariable("token") String token) {
+		Integer authorizedAccountId = accountService.getAuthorizedAccountId();
+		if (!accountService.isSameAccount(authorizedAccountId, username)) {
+			throw new PermissionRequiredException("User only has access to picture of themselves");
 		}
-		pictureService.deletePicture(name, authorizedAccount.getId());
-		return ResponseEntity.ok().build();
+		return ResponseEntity.ok(pictureService.deletePicture(username, token));
 	}
 
 }

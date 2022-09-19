@@ -16,6 +16,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Service
 public class AccountService {
 
@@ -40,6 +44,19 @@ public class AccountService {
 				.build();
 		Account savedAccount = accountRepository.save(accountForDb);
 		return savedAccount.getId();
+	}
+
+	public Map<Integer, String> getIdToUsernameMap(List<Integer> ids) {
+		return accountRepository.getAccountsByIds(ids).stream()
+				.collect(Collectors.toMap(
+						Account::getId,
+						Account::getUsername,
+						(f, s) -> f
+				));
+	}
+
+	public boolean isSameAccount(Integer accountId, String username) {
+		return accountRepository.isSameAccount(accountId, username);
 	}
 
 	public String getAuthToken(String username, String password) {
@@ -82,6 +99,14 @@ public class AccountService {
 		return account.getUsername();
 	}
 
+	public Integer getIdByUsername(String username) {
+		Account accountByUsername = accountRepository.getAccountByUsername(username);
+		if (accountByUsername == null) {
+			throw new AccountNotFoundException(String.format("Account with username [%s] was now found", username));
+		}
+		return accountByUsername.getId();
+	}
+
 	public Account getAccountByUsername(String username) {
 		if (username == null || username.isBlank()) {
 			throw new RuntimeException("Username cannot be blank");
@@ -100,8 +125,22 @@ public class AccountService {
 		return accountRepository.getById(id);
 	}
 
-	public static AccountUserDetails getAuthorizedAccount() {
-		return (AccountUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+	public AccountUserDetails getAuthorizedAccount() {
+		Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		if (principal instanceof String && principal.equals("anonymousUser")) {
+			return null;
+		}
+		try {
+			return (AccountUserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+		} catch (Throwable t) {
+			LOG.error("Cannot get authorized user", t);
+			return null;
+		}
+	}
+
+	public Integer getAuthorizedAccountId() {
+		AccountUserDetails authorizedAccount = getAuthorizedAccount();
+		return authorizedAccount != null ? authorizedAccount.getId() : null;
 	}
 
 	public void validateAccount(AccountInDto accountInDto) {
