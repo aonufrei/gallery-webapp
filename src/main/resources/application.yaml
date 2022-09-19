@@ -1,4 +1,10 @@
 spring:
+  spring:
+    servlet:
+      multipart:
+        enabled: true
+        max-file-size: 30000000
+        max-request-size: 35000000
   jpa:
     hibernate:
       ddl-auto: none
@@ -15,3 +21,10 @@ s3:
   access-key: ${S3_ACCESS_KEY}
   secret-key: ${S3_SECRET_KEY}
   main-bucket-name: ${MAIN_S3_BUCKET}
+
+server:
+  tomcat:
+    connection-timeout: 60
+
+host:
+  url: http://localhost:8080/
