@@ -26,4 +26,4 @@ server:
     connection-timeout: 60
 
 host:
-  url: http://localhost:8080/
+  url: ${MAIN_URL}
