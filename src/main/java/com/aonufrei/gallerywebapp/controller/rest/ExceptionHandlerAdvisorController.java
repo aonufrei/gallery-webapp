@@ -1,6 +1,7 @@
 package com.aonufrei.gallerywebapp.controller.rest;
 
 import com.aonufrei.gallerywebapp.dto.response.ErrorResponse;
+import com.aonufrei.gallerywebapp.exceptions.AccountNotFoundException;
 import com.aonufrei.gallerywebapp.exceptions.GeneralRequestError;
 import com.aonufrei.gallerywebapp.exceptions.PermissionRequiredException;
 import com.aonufrei.gallerywebapp.exceptions.PictureNotFoundException;
@@ -21,6 +22,11 @@ public class ExceptionHandlerAdvisorController extends ResponseEntityExceptionHa
 	@ExceptionHandler(value = PictureNotFoundException.class)
 	protected ResponseEntity<ErrorResponse> handlePictureNotFoundError(PictureNotFoundException pictureNotFoundError) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(pictureNotFoundError.getMessage(), true));
+	}
+
+	@ExceptionHandler(value = AccountNotFoundException.class)
+	protected ResponseEntity<ErrorResponse> handleAccountNotFoundError(AccountNotFoundException accountNotFoundError) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(accountNotFoundError.getMessage(), true));
 	}
 
 	@ExceptionHandler(value = PermissionRequiredException.class)

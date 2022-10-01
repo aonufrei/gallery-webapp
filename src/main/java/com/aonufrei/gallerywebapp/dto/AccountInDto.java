@@ -1,5 +1,6 @@
 package com.aonufrei.gallerywebapp.dto;
 
+import io.swagger.v3.oas.annotations.Parameter;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 

@@ -5,6 +5,9 @@ import com.aonufrei.gallerywebapp.dto.response.account.AccountResponse;
 import com.aonufrei.gallerywebapp.dto.response.account.AccountTokenResponse;
 import com.aonufrei.gallerywebapp.dto.response.account.IsAccountResponse;
 import com.aonufrei.gallerywebapp.service.AccountService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "Accounts", description = "Account API")
 @RequestMapping("api/v1/auth")
 public class AccountRestController {
 
@@ -25,7 +29,8 @@ public class AccountRestController {
 		this.accountService = accountService;
 	}
 
-	@PostMapping("/register")
+	@PostMapping("register")
+	@Operation(summary = "Register account", description = "Is used to create user account")
 	public ResponseEntity<IsAccountResponse> registerAccount(@RequestBody AccountInDto accountInDto) {
 		try {
 			accountService.createAccount(accountInDto);
@@ -37,6 +42,7 @@ public class AccountRestController {
 	}
 
 	@PostMapping("login")
+	@Operation(summary = "Login into the account", description = "Is used to login. Returns authorization token")
 	public ResponseEntity<IsAccountResponse> getAuthKey(@RequestBody AccountInDto accountInDto) {
 		System.out.println(accountInDto);
 		try {

@@ -8,7 +8,9 @@ import com.aonufrei.gallerywebapp.exceptions.PermissionRequiredException;
 import com.aonufrei.gallerywebapp.security.data.AccountUserDetails;
 import com.aonufrei.gallerywebapp.service.AccountService;
 import com.aonufrei.gallerywebapp.service.PictureService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -25,11 +27,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 
 @RestController
 @RequestMapping("api/v1/picture")
+@Tag(name = "Pictures", description = "Picture API")
 @SecurityRequirement(name = "app-security")
 public class PictureRestController {
 
@@ -43,6 +45,7 @@ public class PictureRestController {
 		this.accountService = accountService;
 	}
 	@GetMapping("feeds")
+	@Operation(summary = "Feeds", description = "Returns all public images in the system.")
 	public ResponseEntity<List<PictureOutDto>> getAllPublicImage(@RequestParam("page_size") Integer size,
 	                                                             @RequestParam("page_number") Integer number) {
 		List<PictureOutDto> allPublicImages = pictureService.getAllPublicImages(size, number);
@@ -50,6 +53,8 @@ public class PictureRestController {
 	}
 
 	@GetMapping("{username}")
+	@Operation(summary = "Get all user pictures", description = "Returns all public pictures of the specified user. " +
+			"Private pictures are not shown to non-owner accounts.")
 	private ResponseEntity<List<PictureOutDto>> getAllPicturesForUser(@PathVariable("username") String username,
 	                                                                  @RequestParam("page_size") Integer size,
 	                                                                  @RequestParam("page_number") Integer number) {
@@ -59,6 +64,8 @@ public class PictureRestController {
 	}
 
 	@GetMapping("{username}/{token}")
+	@Operation(summary = "Get specific picture information", description = "Returns picture information by username an token. " +
+			"Private pictures are not shown to non-owner accounts.")
 	private ResponseEntity<PictureOutDto> getUserPictureInfo(@PathVariable("username") String username,
 	                                                     @PathVariable("token") String token) {
 		// private image will be shown to owner only
@@ -74,6 +81,7 @@ public class PictureRestController {
 	}
 
 	@GetMapping(value = "{username}/{token}/pic", produces = MediaType.IMAGE_JPEG_VALUE)
+	@Operation(summary = "View picture", description = "Returns picture to view by user and token.")
 	private ResponseEntity<byte[]> getUserPicture(@PathVariable("username") String username,
 														 @PathVariable("token") String token) {
 		// private image will be shown to owner only
@@ -87,7 +95,8 @@ public class PictureRestController {
 		}
 	}
 
-	@PostMapping
+	@PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+	@Operation(summary = "Create picture", description = "Creates picture by providing information and multipart file.")
 	private ResponseEntity<PictureOutDto> createPicture(@RequestParam(value = "name", required = false) String pictureName,
 														@RequestParam(value = "is_public", required = false) Boolean isPublic,
 														@RequestParam(value = "pic") MultipartFile pictureFile) {
@@ -105,6 +114,8 @@ public class PictureRestController {
 	}
 
 	@PutMapping("{username}/{token}")
+	@Operation(summary = "Update picture information", description = "Updates picture information. Fields that are" +
+			" missed will not change. User can update only his pictures.")
 	private ResponseEntity<PictureOutDto> updatePictureInfo(@PathVariable("username") String username,
 															@PathVariable("token") String token,
 															@RequestBody PictureInfoDto pictureInfoDto) {
@@ -123,6 +134,8 @@ public class PictureRestController {
 	}
 
 	@DeleteMapping("{username}/{token}")
+	@Operation(summary = "Delete picture", description = "Deletes picture by username and picture token. " +
+			"User can delete only his pictures.")
 	private ResponseEntity<Boolean> deletePicture(@PathVariable("username") String username, @PathVariable("token") String token) {
 		Integer authorizedAccountId = accountService.getAuthorizedAccountId();
 		if (!accountService.isSameAccount(authorizedAccountId, username)) {

@@ -1,10 +1,9 @@
 spring:
-  spring:
-    servlet:
-      multipart:
-        enabled: true
-        max-file-size: 30000000
-        max-request-size: 35000000
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 70MB
+      max-request-size: 70MB
   jpa:
     hibernate:
       ddl-auto: none
