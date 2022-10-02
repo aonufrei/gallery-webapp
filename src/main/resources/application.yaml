@@ -27,3 +27,6 @@ server:
 
 host:
   url: ${MAIN_URL}
+
+jwt:
+  secret: ${SECRET_KEY}

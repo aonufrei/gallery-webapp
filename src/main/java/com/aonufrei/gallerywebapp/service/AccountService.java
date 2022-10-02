@@ -8,6 +8,7 @@ import com.aonufrei.gallerywebapp.exceptions.InvalidAccountIdFormatException;
 import com.aonufrei.gallerywebapp.model.Account;
 import com.aonufrei.gallerywebapp.repo.AccountRepository;
 import com.aonufrei.gallerywebapp.security.data.AccountUserDetails;
+import com.aonufrei.gallerywebapp.security.data.JwtService;
 import com.aonufrei.gallerywebapp.utils.GeneralUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
@@ -16,6 +17,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,11 +31,14 @@ public class AccountService {
 	private final AccountRepository accountRepository;
 	private final PasswordEncoder passwordEncoder;
 
+	private final JwtService jwtService;
+
 	private final IsTokenService<AccountInDto> tokenService;
 
-	public AccountService(AccountRepository accountRepository, PasswordEncoder passwordEncoder, IsTokenService<AccountInDto> tokenService) {
+	public AccountService(AccountRepository accountRepository, PasswordEncoder passwordEncoder, JwtService jwtService, IsTokenService<AccountInDto> tokenService) {
 		this.accountRepository = accountRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.jwtService = jwtService;
 		this.tokenService = tokenService;
 	}
 
@@ -73,7 +80,18 @@ public class AccountService {
 			throw new AuthorizationError("Forbidden");
 		}
 
-		return tokenService.encode(username, password);
+		try {
+			return generateToken(username);
+		} catch (Throwable t) {
+			LOG.error("Error when creating token", t);
+			throw new AuthorizationError("Forbidden");
+		}
+	}
+
+	private String generateToken(String username) {
+		Instant now = Instant.now();
+		Map<String, Object> claims = Map.of("username", username);
+		return jwtService.encode("Auth", claims, now, now.plus(7, ChronoUnit.DAYS));
 	}
 
 	public Integer validateAccountId(String accountId) {

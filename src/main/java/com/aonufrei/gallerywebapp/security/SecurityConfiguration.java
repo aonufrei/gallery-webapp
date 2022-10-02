@@ -38,8 +38,10 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
 				.and()
 				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
 				.authorizeRequests()
-				.antMatchers("/api/v1/auth/register", "api/v1/auth/login").permitAll()
-				.antMatchers("/api/v1/*").authenticated();
+				.antMatchers("/api/v1/auth/*").permitAll()
+				.antMatchers("/api/v1/picture/*/*/pic").permitAll()
+				.antMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+				.anyRequest().authenticated();
 	}
 
 	@Override

@@ -44,7 +44,6 @@ public class AccountRestController {
 	@PostMapping("login")
 	@Operation(summary = "Login into the account", description = "Is used to login. Returns authorization token")
 	public ResponseEntity<IsAccountResponse> getAuthKey(@RequestBody AccountInDto accountInDto) {
-		System.out.println(accountInDto);
 		try {
 			String token = accountService.getAuthToken(accountInDto.getUsername(), accountInDto.getPassword());
 			return ResponseEntity.ok(new AccountTokenResponse(token));

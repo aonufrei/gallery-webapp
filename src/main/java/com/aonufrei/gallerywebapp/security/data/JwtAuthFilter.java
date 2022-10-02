@@ -2,6 +2,8 @@ package com.aonufrei.gallerywebapp.security.data;
 
 import com.aonufrei.gallerywebapp.model.Account;
 import com.aonufrei.gallerywebapp.service.AccountService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,9 +21,11 @@ import java.io.IOException;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
 	private final AccountService accountService;
+	private final JwtService jwtService;
 
-	public JwtAuthFilter(AccountService accountService) {
+	public JwtAuthFilter(AccountService accountService, JwtService jwtService) {
 		this.accountService = accountService;
+		this.jwtService = jwtService;
 	}
 
 	@Override
@@ -35,11 +39,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 		if (StringUtils.isBlank(authorization)) {
 			return;
 		}
-		String[] parts = authorization.substring(7).split(":");
-		if (parts.length != 2) {
+		if (authorization.length() < 8) {
 			return;
 		}
-		String username = parts[0];
+		String token = authorization.substring(7);
+		String username = getUsernameFromToken(token);
+		if (username == null) {
+			return;
+		}
 		Account accountByUsername;
 		try {
 			accountByUsername = accountService.getAccountByUsername(username);
@@ -51,6 +58,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 		UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(accountUserDetails, null, accountUserDetails.getAuthorities());
 		SecurityContextHolder.getContext().setAuthentication(auth);
 		auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+	}
+
+	private String getUsernameFromToken(String token) {
+		if (token == null) {
+			return null;
+		}
+		Jws<Claims> decode;
+		try {
+			decode = jwtService.decode(token);
+		} catch (Throwable ignore) {
+			return null;
+		}
+		return decode.getBody().get("username", String.class);
 	}
 
 }
