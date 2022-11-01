@@ -6,6 +6,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.aonufrei.gallerywebapp.dto.PictureInfoDto;
 import com.aonufrei.gallerywebapp.dto.PictureOutDto;
+import com.aonufrei.gallerywebapp.exceptions.GeneralRequestError;
 import com.aonufrei.gallerywebapp.exceptions.PictureNotFoundException;
 import com.aonufrei.gallerywebapp.model.Picture;
 import com.aonufrei.gallerywebapp.repo.PictureRepository;
@@ -57,11 +58,22 @@ public class PictureService {
 	}
 
 	public List<PictureOutDto> getAllPublicImages(Integer pageSize, Integer pageNumber) {
-		return convertModelsToOutDto(pictureRepository.getPicturesByIsSharedToPublic(true, Pageable.ofSize(pageSize).withPage(pageNumber)).toList());
+		Pageable page;
+		try {
+			page = Pageable.ofSize(pageSize).withPage(pageNumber);
+		} catch (Exception e) {
+			throw new GeneralRequestError(e.getMessage());
+		}
+		return convertModelsToOutDto(pictureRepository.getPicturesByIsSharedToPublic(true, page).toList());
 	}
 
 	public List<PictureOutDto> getPicturesForUser(Integer currentUserId, String username, Integer pageSize, Integer pageNumber) {
-		Pageable pageable = Pageable.ofSize(pageSize).withPage(pageNumber);
+		Pageable pageable;
+		try {
+			pageable = Pageable.ofSize(pageSize).withPage(pageNumber);
+		} catch (Exception e) {
+			throw new GeneralRequestError(e.getMessage());
+		}
 		Integer ownerId = accountService.getIdByUsername(username);
 		Page<Picture> result = currentUserId != null && currentUserId.equals(ownerId)
 				? pictureRepository.getPicturesByOwnerIdOrderByModifiedAt(ownerId, pageable)
@@ -115,7 +127,13 @@ public class PictureService {
 	}
 
 	public List<PictureOutDto> getPictures(Integer pageSize, Integer pageNumber) {
-		return pictureRepository.findAll(Pageable.ofSize(pageSize).withPage(pageNumber)).stream()
+		Pageable pageable;
+		try {
+			pageable = Pageable.ofSize(pageSize).withPage(pageNumber);
+		} catch (Exception e) {
+			throw new GeneralRequestError(e.getMessage());
+		}
+		return pictureRepository.findAll(pageable).stream()
 				.map(this::convertModelToOutDto)
 				.collect(Collectors.toList());
 	}

@@ -30,3 +30,7 @@ host:
 
 jwt:
   secret: ${SECRET_KEY}
+
+logging:
+  file:
+    name: logs.log
