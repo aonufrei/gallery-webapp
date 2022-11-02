@@ -1,4 +1,4 @@
-# Easy deploy Spring Boot Application to EC2
+# Spring Boot Application to EC2 deployment guide
 
 I developed a Gallery web application using Spring Boot, Amazon S3 and MySQL. So now I wish to deploy my project to the EC2 server and make it available to the web.
 
