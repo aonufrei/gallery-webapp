@@ -102,9 +102,9 @@ Navigate to `/etc/nginx/`
 cd /etc/nginx
 ```
 
-Create a new file in `/etc/nginx/sites-available/` folder
+Create a new file in `/etc/nginx/available-sites/` folder
 ```
-sudo touch /etc/nginx/available-sites/gallery
+sudo touch ./available-sites/gallery
 ```
 
 Open the created file and add following configs to it:
